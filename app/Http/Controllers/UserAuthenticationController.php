@@ -2,37 +2,50 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\UserRegistrationFormRequest;
 use Illuminate\Support\Facades\Auth;
-
-use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Services\UserService;
+use Illuminate\Http\Request;
 
 class UserAuthenticationController extends Controller
 {
-    //
-public function register(Request $request)
+    protected $userService, $user;
+  
+    public function __construct(UserService $userService)
     {
-        $name = $request->input('name');
-        $email = strtolower($request->input('email'));
-        $password = $request->input('password');
+        $this->userService = $userService;
+    }  
 
-        $user = User::create([
-            'name' => $name,
-            'email' => $email,
-            'password' => Hash::make($password)
-        ]);
+    function register(Request $request)
+    {
+        $userData = [
+            'name' => $request->input('name'),
+            'email' => strtolower($request->input('email')),
+            'password' => $request->input('password'),
+        ];
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $validateUserData = $this->userService->validateUserData($userData);
+
+        if ($validateUserData) {
+            return response()->json([
+                'message' => 'Validation fails',
+                'errors' => $validateUserData,
+            ], 422);
+        }
+
+        $user = $this->userService->registerUser($userData);
+        $token = $user->createToken('auth_token')->plainTextToken;     
 
         return response()->json([
-            'message' => 'User Account Created Successfully',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-        ], 201);
-    }
+             'user'=> $user,
+             'message' => 'User Account Created Successfully',
+             'access_token' => $token,
+             'token_type' => 'Bearer',
+            ],200);  
+    }    
 
-public function login(Request $request)
+    public function login(UserRegistrationFormRequest $request)
     {
         $email = strtolower($request->input('email'));
         $password = $request->input('password');
@@ -58,7 +71,7 @@ public function login(Request $request)
         ],200);
     }
 
-public function logout()
+    public function logout()
     {
          $user = Auth::user();
     
